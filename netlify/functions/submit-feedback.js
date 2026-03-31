@@ -35,22 +35,24 @@ exports.handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ error: 'Title is required' }) };
   }
 
-  // Resolve team UUID and project ID in one query
+  // Use viewer-scoped query — works with minimal API key permissions
   let teamId = null;
   let projectId = null;
   try {
     const data = await linearRequest(apiKey, `
       query {
-        teams {
-          nodes {
-            id
-            identifier
-            projects { nodes { id name } }
+        viewer {
+          teams {
+            nodes {
+              id
+              identifier
+              projects { nodes { id name } }
+            }
           }
         }
       }
     `);
-    const team = data.data?.teams?.nodes?.find(t => t.identifier === TEAM_IDENTIFIER);
+    const team = data.data?.viewer?.teams?.nodes?.find(t => t.identifier === TEAM_IDENTIFIER);
     teamId = team?.id ?? null;
     const project = team?.projects?.nodes?.find(p => p.name === PROJECT_NAME);
     projectId = project?.id ?? null;
@@ -59,7 +61,7 @@ exports.handler = async (event) => {
   }
 
   if (!teamId) {
-    return { statusCode: 500, body: JSON.stringify({ error: `Could not find team with identifier "${TEAM_IDENTIFIER}"` }) };
+    return { statusCode: 500, body: JSON.stringify({ error: `Could not find team "${TEAM_IDENTIFIER}". Make sure your LINEAR_API_KEY has Read permission.` }) };
   }
 
   const mutation = `

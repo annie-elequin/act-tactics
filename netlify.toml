@@ -1,3 +1,10 @@
 [build]
   command = "echo \"window.BASEROW_TOKEN='$BASEROW_TOKEN';\" > config.js"
   publish = "."
+  functions = "netlify/functions"
+
+[build.environment]
+  # Set these in Netlify → Site configuration → Environment variables:
+  # BASEROW_TOKEN  = your Baserow API token
+  # LINEAR_API_KEY = your Linear personal API key (Settings > Account > Security & Access > API Keys)
+  #                  Scope it to "Create issues" only on the Act Tactics team.

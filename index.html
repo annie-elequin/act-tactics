@@ -23,10 +23,12 @@ input[type=text]{min-width:200px;}
 input[type=text]::placeholder{color:#666;}
 input[type=text]:focus{border-color:#7c3aed;}
 .count{font-size:12px;color:#666;white-space:nowrap;}
-.btn-refresh{background:#2a2a2a;border:1px solid #444;color:#ccc;font-family:'Open Sans',sans-serif;font-size:12px;font-weight:600;padding:5px 12px;border-radius:5px;cursor:pointer;display:flex;align-items:center;gap:5px;transition:background 0.15s,color 0.15s;}
-.btn-refresh:hover{background:#3a3a3a;color:#fff;}
-.btn-refresh:disabled{opacity:0.5;cursor:not-allowed;}
-.btn-refresh .spin{display:inline-block;animation:spin 0.7s linear infinite;}
+.btn-header{font-family:'Open Sans',sans-serif;font-size:12px;font-weight:600;padding:5px 12px;border-radius:5px;border:1px solid #444;background:#2a2a2a;color:#ccc;cursor:pointer;display:flex;align-items:center;gap:5px;transition:background 0.15s,color 0.15s;white-space:nowrap;}
+.btn-header:hover{background:#3a3a3a;color:#fff;}
+.btn-header:disabled{opacity:0.5;cursor:not-allowed;}
+.btn-header .spin{display:inline-block;animation:spin 0.7s linear infinite;}
+.btn-feedback{border-color:#4c2a7a;color:#c4b5fd;}
+.btn-feedback:hover{background:#2a1a3a;color:#e9d5ff;}
 
 /* ── Loading / Error ─────────────────────────────────────────── */
 .state{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:16px;text-align:center;padding:40px;}
@@ -42,7 +44,7 @@ main{padding:24px 16px 60px;max-width:1400px;margin:0 auto;display:none;}
 .grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:20px;}
 .empty{text-align:center;padding:60px 20px;color:#999;font-style:italic;grid-column:1/-1;font-size:15px;}
 
-/* ── Card wrapper (title + card) ─────────────────────────────── */
+/* ── Card wrapper ────────────────────────────────────────────── */
 .card-wrap{display:flex;flex-direction:column;gap:6px;}
 .card-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#888;padding:0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 
@@ -72,6 +74,30 @@ main{padding:24px 16px 60px;max-width:1400px;margin:0 auto;display:none;}
 .cfooter{padding:5px 10px;border-top:0.5px solid #eee;display:flex;justify-content:space-between;align-items:center;background:#fafaf8;}
 .fclass{font-size:10px;color:#999;text-transform:capitalize;}
 .cpip{width:20px;height:20px;border-radius:50%;border:1.5px solid #ccc;background:#fff;font-size:12px;font-weight:700;color:#333;display:flex;align-items:center;justify-content:center;}
+
+/* ── Feedback Modal ──────────────────────────────────────────── */
+.modal-overlay{position:fixed;inset:0;background:rgba(0,0,0,0.6);z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;opacity:0;pointer-events:none;transition:opacity 0.2s;}
+.modal-overlay.open{opacity:1;pointer-events:all;}
+.modal{background:#1a1a24;border:1px solid #2a2a3a;border-radius:14px;padding:28px;width:100%;max-width:480px;display:flex;flex-direction:column;gap:18px;transform:translateY(12px);transition:transform 0.2s;}
+.modal-overlay.open .modal{transform:translateY(0);}
+.modal-header{display:flex;align-items:center;justify-content:space-between;}
+.modal-title{font-size:16px;font-weight:700;color:#e8e8f0;}
+.modal-close{background:none;border:none;color:#666;font-size:20px;cursor:pointer;line-height:1;padding:2px 6px;border-radius:4px;}
+.modal-close:hover{color:#ccc;background:#2a2a3a;}
+.modal label{font-size:12px;font-weight:600;text-transform:uppercase;letter-spacing:1px;color:#a78bfa;display:block;margin-bottom:6px;}
+.modal input[type=text],.modal textarea{width:100%;padding:10px 14px;background:#0f0f18;border:1px solid #3a3a50;border-radius:8px;color:#e8e8f0;font-family:'Open Sans',sans-serif;font-size:14px;outline:none;transition:border-color 0.2s;resize:vertical;}
+.modal input[type=text]:focus,.modal textarea:focus{border-color:#7c3aed;}
+.modal textarea{min-height:100px;}
+.modal input[type=text]::placeholder,.modal textarea::placeholder{color:#444;}
+.modal-footer{display:flex;gap:10px;justify-content:flex-end;align-items:center;}
+.modal-status{font-size:13px;flex:1;}
+.modal-status.success{color:#4ade80;}
+.modal-status.error{color:#f87171;}
+.btn-submit{padding:9px 22px;border-radius:8px;background:#7c3aed;color:#fff;border:none;font-family:'Open Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer;transition:background 0.15s;}
+.btn-submit:hover:not(:disabled){background:#6d28d9;}
+.btn-submit:disabled{opacity:0.5;cursor:not-allowed;}
+.btn-cancel{padding:9px 16px;border-radius:8px;background:transparent;color:#888;border:1px solid #3a3a50;font-family:'Open Sans',sans-serif;font-size:14px;cursor:pointer;transition:color 0.15s,border-color 0.15s;}
+.btn-cancel:hover{color:#ccc;border-color:#666;}
 </style>
 </head>
 <body>
@@ -85,9 +111,10 @@ main{padding:24px 16px 60px;max-width:1400px;margin:0 auto;display:none;}
     <input type="text" id="search" placeholder="Search cards…">
     <select id="filterClass"><option value="">All classes</option></select>
     <select id="filterType"><option value="">All types</option></select>
-    <button class="btn-refresh" id="btnRefresh" onclick="refreshCards()" title="Refresh cards from Baserow">
+    <button class="btn-header" id="btnRefresh" onclick="refreshCards()">
       <span id="refreshIcon">↺</span> Refresh
     </button>
+    <button class="btn-header btn-feedback" onclick="openFeedback()">💬 Feedback</button>
     <span class="count" id="count"></span>
   </div>
 </header>
@@ -101,6 +128,29 @@ main{padding:24px 16px 60px;max-width:1400px;margin:0 auto;display:none;}
 <main id="main">
   <div class="grid" id="grid"></div>
 </main>
+
+<!-- Feedback Modal -->
+<div class="modal-overlay" id="modalOverlay" onclick="handleOverlayClick(event)">
+  <div class="modal">
+    <div class="modal-header">
+      <span class="modal-title">💬 Submit Feedback</span>
+      <button class="modal-close" onclick="closeFeedback()">✕</button>
+    </div>
+    <div>
+      <label for="fbTitle">Title</label>
+      <input type="text" id="fbTitle" placeholder="Short summary of your feedback…" maxlength="200">
+    </div>
+    <div>
+      <label for="fbDesc">Details <span style="color:#555;font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label>
+      <textarea id="fbDesc" placeholder="Any additional context, steps to reproduce, or suggestions…"></textarea>
+    </div>
+    <div class="modal-footer">
+      <span class="modal-status" id="modalStatus"></span>
+      <button class="btn-cancel" onclick="closeFeedback()">Cancel</button>
+      <button class="btn-submit" id="btnSubmit" onclick="submitFeedback()">Submit →</button>
+    </div>
+  </div>
+</div>
 
 <script>
 const TABLE_ID = 911939;
@@ -151,7 +201,6 @@ async function loadCards(isRefresh = false) {
 }
 
 function init(rows, isRefresh = false) {
-  // Snapshot current filter values before rebuilding
   const prevSearch = searchEl ? searchEl.value : '';
   const prevClass  = filterClass ? filterClass.value : '';
   const prevType   = filterType ? filterType.value : '';
@@ -168,7 +217,6 @@ function init(rows, isRefresh = false) {
     };
   });
 
-  // Rebuild filter dropdowns (preserve selection)
   const classes = [...new Set(allCards.map(c => c.cls))].sort();
   const types   = [...new Set(allCards.map(c => c.type))].sort();
   filterClass.innerHTML = '<option value="">All classes</option>';
@@ -176,7 +224,6 @@ function init(rows, isRefresh = false) {
   classes.forEach(cl => filterClass.innerHTML += `<option value="${cl}">${cap(cl)}</option>`);
   types.forEach(t   => filterType.innerHTML  += `<option value="${t}">${cap(t.replace('_',' '))}</option>`);
 
-  // Restore previous filter values
   if (isRefresh) {
     searchEl.value    = prevSearch;
     filterClass.value = prevClass;
@@ -227,6 +274,72 @@ function setState(type, title, sub, retry = false) {
     ? `<div class="spinner"></div><div class="state-title">${title}</div><div class="state-sub">${sub}</div>`
     : `<div style="font-size:40px">⚠️</div><div class="state-title">${title}</div><div class="state-sub">${sub}</div>${retry ? '<button class="btn-retry" onclick="fetchCards()">↺ Try Again</button>' : ''}`;
 }
+
+// ── Feedback modal ─────────────────────────────────────────────
+function openFeedback() {
+  document.getElementById('fbTitle').value = '';
+  document.getElementById('fbDesc').value = '';
+  document.getElementById('modalStatus').textContent = '';
+  document.getElementById('modalStatus').className = 'modal-status';
+  document.getElementById('btnSubmit').disabled = false;
+  document.getElementById('btnSubmit').textContent = 'Submit →';
+  document.getElementById('modalOverlay').classList.add('open');
+  setTimeout(() => document.getElementById('fbTitle').focus(), 50);
+}
+
+function closeFeedback() {
+  document.getElementById('modalOverlay').classList.remove('open');
+}
+
+function handleOverlayClick(e) {
+  if (e.target === document.getElementById('modalOverlay')) closeFeedback();
+}
+
+async function submitFeedback() {
+  const title = document.getElementById('fbTitle').value.trim();
+  const description = document.getElementById('fbDesc').value.trim();
+  const statusEl = document.getElementById('modalStatus');
+  const submitBtn = document.getElementById('btnSubmit');
+
+  if (!title) {
+    statusEl.textContent = 'Please add a title.';
+    statusEl.className = 'modal-status error';
+    document.getElementById('fbTitle').focus();
+    return;
+  }
+
+  submitBtn.disabled = true;
+  submitBtn.textContent = 'Submitting…';
+  statusEl.textContent = '';
+  statusEl.className = 'modal-status';
+
+  try {
+    const res = await fetch('/.netlify/functions/submit-feedback', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ title, description }),
+    });
+    const data = await res.json();
+    if (data.success) {
+      statusEl.textContent = `✓ Submitted as ${data.issue.identifier}`;
+      statusEl.className = 'modal-status success';
+      submitBtn.textContent = 'Done!';
+      setTimeout(closeFeedback, 1800);
+    } else {
+      throw new Error(data.error || 'Unknown error');
+    }
+  } catch(e) {
+    statusEl.textContent = `Error: ${e.message}`;
+    statusEl.className = 'modal-status error';
+    submitBtn.disabled = false;
+    submitBtn.textContent = 'Submit →';
+  }
+}
+
+// Close modal on Escape
+document.addEventListener('keydown', e => {
+  if (e.key === 'Escape') closeFeedback();
+});
 
 // ── Utils ──────────────────────────────────────────────────────
 function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }

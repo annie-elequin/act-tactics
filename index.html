@@ -5,9 +5,12 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Act Tactics — Card Visualizer</title>
 <script src="config.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
-body{font-family:Georgia,serif;background:#f5f4f0;color:#1a1a1a;min-height:100vh;}
+body{font-family:'Open Sans',sans-serif;background:#f5f4f0;color:#1a1a1a;min-height:100vh;}
 
 /* ── Header ─────────────────────────────────────────────────── */
 header{background:#1a1a1a;color:#f5f4f0;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,0.4);}
@@ -15,11 +18,15 @@ header{background:#1a1a1a;color:#f5f4f0;padding:14px 24px;display:flex;align-ite
 header h1{font-size:15px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;}
 .badge{font-size:10px;font-weight:700;background:#2a2a2a;color:#888;padding:2px 8px;border-radius:3px;letter-spacing:0.5px;}
 .controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
-input[type=text],select{font-family:Georgia,serif;font-size:13px;padding:5px 10px;border-radius:5px;border:1px solid #444;background:#2a2a2a;color:#f0f0f0;outline:none;cursor:pointer;}
+input[type=text],select{font-family:'Open Sans',sans-serif;font-size:13px;padding:5px 10px;border-radius:5px;border:1px solid #444;background:#2a2a2a;color:#f0f0f0;outline:none;cursor:pointer;}
 input[type=text]{min-width:200px;}
 input[type=text]::placeholder{color:#666;}
 input[type=text]:focus{border-color:#7c3aed;}
-.count{font-size:12px;color:#666;white-space:nowrap;font-family:-apple-system,sans-serif;}
+.count{font-size:12px;color:#666;white-space:nowrap;}
+.btn-refresh{background:#2a2a2a;border:1px solid #444;color:#ccc;font-family:'Open Sans',sans-serif;font-size:12px;font-weight:600;padding:5px 12px;border-radius:5px;cursor:pointer;display:flex;align-items:center;gap:5px;transition:background 0.15s,color 0.15s;}
+.btn-refresh:hover{background:#3a3a3a;color:#fff;}
+.btn-refresh:disabled{opacity:0.5;cursor:not-allowed;}
+.btn-refresh .spin{display:inline-block;animation:spin 0.7s linear infinite;}
 
 /* ── Loading / Error ─────────────────────────────────────────── */
 .state{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:16px;text-align:center;padding:40px;}
@@ -27,20 +34,20 @@ input[type=text]:focus{border-color:#7c3aed;}
 @keyframes spin{to{transform:rotate(360deg)}}
 .state-title{font-size:18px;font-weight:700;color:#333;}
 .state-sub{font-size:14px;color:#888;max-width:380px;line-height:1.6;}
-.btn-retry{padding:10px 22px;border-radius:8px;background:#7c3aed;color:#fff;border:none;font-size:14px;font-weight:700;cursor:pointer;margin-top:4px;}
+.btn-retry{padding:10px 22px;border-radius:8px;background:#7c3aed;color:#fff;border:none;font-family:'Open Sans',sans-serif;font-size:14px;font-weight:700;cursor:pointer;margin-top:4px;}
 .btn-retry:hover{background:#6d28d9;}
 
 /* ── Grid ────────────────────────────────────────────────────── */
 main{padding:24px 16px 60px;max-width:1400px;margin:0 auto;display:none;}
-.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:20px;}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(240px,1fr));gap:20px;}
 .empty{text-align:center;padding:60px 20px;color:#999;font-style:italic;grid-column:1/-1;font-size:15px;}
 
 /* ── Card wrapper (title + card) ─────────────────────────────── */
 .card-wrap{display:flex;flex-direction:column;gap:6px;}
 .card-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#888;padding:0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
 
-/* ── Card styles (from viewer) ───────────────────────────────── */
-.card{background:#fff;border-radius:10px;border:0.5px solid #ddd;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06);transition:transform 0.15s,box-shadow 0.15s;}
+/* ── Card styles ─────────────────────────────────────────────── */
+.card{background:#fff;border-radius:10px;border:0.5px solid #ddd;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06);transition:transform 0.15s,box-shadow 0.15s;font-family:'Open Sans',sans-serif;}
 .card:hover{transform:translateY(-3px);box-shadow:0 4px 12px rgba(0,0,0,0.12);}
 .chead{padding:7px 10px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(0,0,0,0.1);}
 .cname{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:65%;}
@@ -78,6 +85,9 @@ main{padding:24px 16px 60px;max-width:1400px;margin:0 auto;display:none;}
     <input type="text" id="search" placeholder="Search cards…">
     <select id="filterClass"><option value="">All classes</option></select>
     <select id="filterType"><option value="">All types</option></select>
+    <button class="btn-refresh" id="btnRefresh" onclick="refreshCards()" title="Refresh cards from Baserow">
+      <span id="refreshIcon">↺</span> Refresh
+    </button>
     <span class="count" id="count"></span>
   </div>
 </header>
@@ -99,13 +109,30 @@ const API = `https://api.baserow.io/api/database/rows/table/${TABLE_ID}/?user_fi
 
 let allCards = [];
 
-// ── Fetch ──────────────────────────────────────────────────────
+// ── Fetch (initial — shows full loading screen) ────────────────
 async function fetchCards() {
   if (!TOKEN) {
     setState('error', 'No API token', 'Add your Baserow token to config.js (local) or set BASEROW_TOKEN in Netlify env vars.');
     return;
   }
   setState('loading', 'Loading cards…', 'Fetching from Baserow');
+  await loadCards();
+}
+
+// ── Refresh (keeps filters, no full loading screen) ────────────
+async function refreshCards() {
+  if (!TOKEN) return;
+  const btn = document.getElementById('btnRefresh');
+  const icon = document.getElementById('refreshIcon');
+  btn.disabled = true;
+  icon.classList.add('spin');
+  await loadCards(true);
+  icon.classList.remove('spin');
+  btn.disabled = false;
+}
+
+// ── Shared fetch logic ─────────────────────────────────────────
+async function loadCards(isRefresh = false) {
   try {
     const res = await fetch(API, {
       headers: { 'Authorization': `Token ${TOKEN}` }
@@ -113,14 +140,22 @@ async function fetchCards() {
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     const rows = data.results || [];
-    if (!rows.length) { setState('error', 'No cards found', 'The table is empty — run the uploader tool first.'); return; }
-    init(rows);
+    if (!rows.length) {
+      if (!isRefresh) setState('error', 'No cards found', 'The table is empty — run the uploader tool first.');
+      return;
+    }
+    init(rows, isRefresh);
   } catch(e) {
-    setState('error', 'Could not load cards', e.message, true);
+    if (!isRefresh) setState('error', 'Could not load cards', e.message, true);
   }
 }
 
-function init(rows) {
+function init(rows, isRefresh = false) {
+  // Snapshot current filter values before rebuilding
+  const prevSearch = searchEl ? searchEl.value : '';
+  const prevClass  = filterClass ? filterClass.value : '';
+  const prevType   = filterType ? filterType.value : '';
+
   allCards = rows.map(r => {
     const html = r.HTML || '';
     const classMatch = html.match(/<span class="fclass">([^<]+)<\/span>/);
@@ -133,11 +168,20 @@ function init(rows) {
     };
   });
 
-  // Populate filters
+  // Rebuild filter dropdowns (preserve selection)
   const classes = [...new Set(allCards.map(c => c.cls))].sort();
   const types   = [...new Set(allCards.map(c => c.type))].sort();
+  filterClass.innerHTML = '<option value="">All classes</option>';
+  filterType.innerHTML  = '<option value="">All types</option>';
   classes.forEach(cl => filterClass.innerHTML += `<option value="${cl}">${cap(cl)}</option>`);
   types.forEach(t   => filterType.innerHTML  += `<option value="${t}">${cap(t.replace('_',' '))}</option>`);
+
+  // Restore previous filter values
+  if (isRefresh) {
+    searchEl.value    = prevSearch;
+    filterClass.value = prevClass;
+    filterType.value  = prevType;
+  }
 
   document.getElementById('stateEl').style.display = 'none';
   document.getElementById('main').style.display = 'block';

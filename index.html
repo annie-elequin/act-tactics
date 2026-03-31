@@ -1,0 +1,195 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Act Tactics — Card Visualizer</title>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{font-family:Georgia,serif;background:#f5f4f0;color:#1a1a1a;min-height:100vh;}
+
+/* ── Header ─────────────────────────────────────────────────── */
+header{background:#1a1a1a;color:#f5f4f0;padding:14px 24px;display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;position:sticky;top:0;z-index:100;box-shadow:0 2px 12px rgba(0,0,0,0.4);}
+.header-left{display:flex;align-items:center;gap:10px;}
+header h1{font-size:15px;font-weight:700;letter-spacing:1.5px;text-transform:uppercase;}
+.badge{font-size:10px;font-weight:700;background:#2a2a2a;color:#888;padding:2px 8px;border-radius:3px;letter-spacing:0.5px;}
+.controls{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+input[type=text],select{font-family:Georgia,serif;font-size:13px;padding:5px 10px;border-radius:5px;border:1px solid #444;background:#2a2a2a;color:#f0f0f0;outline:none;cursor:pointer;}
+input[type=text]{min-width:200px;}
+input[type=text]::placeholder{color:#666;}
+input[type=text]:focus{border-color:#7c3aed;}
+.count{font-size:12px;color:#666;white-space:nowrap;font-family:-apple-system,sans-serif;}
+
+/* ── Loading / Error ─────────────────────────────────────────── */
+.state{display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:60vh;gap:16px;text-align:center;padding:40px;}
+.spinner{width:44px;height:44px;border:4px solid #ddd;border-top-color:#7c3aed;border-radius:50%;animation:spin 0.8s linear infinite;}
+@keyframes spin{to{transform:rotate(360deg)}}
+.state-title{font-size:18px;font-weight:700;color:#333;}
+.state-sub{font-size:14px;color:#888;max-width:380px;line-height:1.6;}
+.btn-retry{padding:10px 22px;border-radius:8px;background:#7c3aed;color:#fff;border:none;font-size:14px;font-weight:700;cursor:pointer;margin-top:4px;}
+.btn-retry:hover{background:#6d28d9;}
+
+/* ── Grid ────────────────────────────────────────────────────── */
+main{padding:24px 16px 60px;max-width:1400px;margin:0 auto;display:none;}
+.grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(200px,1fr));gap:20px;}
+.empty{text-align:center;padding:60px 20px;color:#999;font-style:italic;grid-column:1/-1;font-size:15px;}
+
+/* ── Card wrapper (title + card) ─────────────────────────────── */
+.card-wrap{display:flex;flex-direction:column;gap:6px;}
+.card-title{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#888;padding:0 2px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+
+/* ── Card styles (from viewer) ───────────────────────────────── */
+.card{background:#fff;border-radius:10px;border:0.5px solid #ddd;display:flex;flex-direction:column;overflow:hidden;box-shadow:0 1px 3px rgba(0,0,0,0.06);transition:transform 0.15s,box-shadow 0.15s;}
+.card:hover{transform:translateY(-3px);box-shadow:0 4px 12px rgba(0,0,0,0.12);}
+.chead{padding:7px 10px;display:flex;justify-content:space-between;align-items:center;border-bottom:1px solid rgba(0,0,0,0.1);}
+.cname{font-size:12px;font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:65%;}
+.cbadge{font-size:10px;font-weight:700;padding:1px 6px;border-radius:3px;background:rgba(0,0,0,0.18);text-transform:uppercase;letter-spacing:0.5px;white-space:nowrap;}
+.cbody{flex:1;padding:8px 10px;display:flex;flex-direction:column;gap:4px;font-size:11px;line-height:1.55;}
+.flv{font-style:italic;color:#666;padding-bottom:5px;border-bottom:0.5px solid #eee;flex-shrink:0;}
+.slbl{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#999;margin-bottom:1px;margin-top:3px;}
+.etxt{color:#222;line-height:1.6;}
+.tp{display:inline-block;padding:0 5px;border-radius:3px;font-size:10.5px;font-weight:700;vertical-align:middle;line-height:1.6;margin:0 1px;}
+.trig{background:#EFF6FF;border-left:2px solid #3B82F6;padding:3px 6px;font-style:italic;color:#1e40af;line-height:1.4;}
+.passbox{border-left:2px solid #a78bfa;padding:3px 6px;color:#555;line-height:1.4;}
+.omenpass{border-left:2px solid #f87171;padding:3px 6px;color:#555;line-height:1.4;}
+.debtbox{border:0.5px solid #a855f7;border-radius:4px;padding:5px 7px;background:#faf5ff;color:#555;line-height:1.5;}
+.debtbox .dt-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#7c3aed;margin-bottom:2px;}
+.discbox{border-left:2px solid #ef4444;padding:3px 6px;font-style:italic;color:#dc2626;line-height:1.4;}
+.hr{height:0.5px;background:#eee;flex-shrink:0;margin:2px 0;}
+.srlbl{font-size:10px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:1px;}
+.sropt{color:#444;line-height:1.4;}
+.flbl{font-size:10px;font-weight:700;color:#dc2626;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:1px;}
+.ftxt{font-style:italic;color:#dc2626;line-height:1.4;}
+.xbadge{font-size:9px;font-weight:700;background:#fef3c7;color:#92400e;padding:1px 5px;border-radius:3px;display:inline-block;margin-bottom:3px;}
+.sbadge{font-size:9px;font-weight:700;background:#dcfce7;color:#166534;padding:1px 5px;border-radius:3px;display:inline-block;margin-bottom:3px;}
+.bftitle{font-size:10px;font-weight:700;text-transform:uppercase;letter-spacing:0.5px;color:#14532D;margin-top:3px;margin-bottom:1px;}
+.spacer{flex:1;}
+.cfooter{padding:5px 10px;border-top:0.5px solid #eee;display:flex;justify-content:space-between;align-items:center;background:#fafaf8;}
+.fclass{font-size:10px;color:#999;text-transform:capitalize;}
+.cpip{width:20px;height:20px;border-radius:50%;border:1.5px solid #ccc;background:#fff;font-size:12px;font-weight:700;color:#333;display:flex;align-items:center;justify-content:center;}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="header-left">
+    <h1>⚔️ Act Tactics</h1>
+    <span class="badge">Card Visualizer</span>
+  </div>
+  <div class="controls">
+    <input type="text" id="search" placeholder="Search cards…">
+    <select id="filterClass"><option value="">All classes</option></select>
+    <select id="filterType"><option value="">All types</option></select>
+    <span class="count" id="count"></span>
+  </div>
+</header>
+
+<div id="stateEl" class="state">
+  <div class="spinner"></div>
+  <div class="state-title">Loading cards…</div>
+  <div class="state-sub">Fetching from Baserow</div>
+</div>
+
+<main id="main">
+  <div class="grid" id="grid"></div>
+</main>
+
+<script>
+const TABLE_ID = 911939;
+const API = `https://api.baserow.io/api/database/rows/table/${TABLE_ID}/?user_field_names=true&size=200`;
+
+let allCards = [];
+
+// ── Fetch ──────────────────────────────────────────────────────
+async function fetchCards() {
+  setState('loading', 'Loading cards…', 'Fetching from Baserow');
+  try {
+    const res = await fetch(API);
+    if (!res.ok) throw new Error(`HTTP ${res.status}`);
+    const data = await res.json();
+    const rows = data.results || [];
+    if (!rows.length) { setState('error', 'No cards found', 'The table is empty — run the uploader tool first.'); return; }
+    init(rows);
+  } catch(e) {
+    setState('error', 'Could not load cards', `${e.message}. Make sure the table has public read access in Baserow.`, true);
+  }
+}
+
+function init(rows) {
+  allCards = rows.map(r => {
+    const html = r.HTML || '';
+    const classMatch = html.match(/<span class="fclass">([^<]+)<\/span>/);
+    const typeMatch  = html.match(/<span class="cbadge"[^>]*>([^<]+)<\/span>/);
+    return {
+      name: r.Name || '',
+      html,
+      cls:  classMatch ? classMatch[1] : 'unknown',
+      type: typeMatch  ? typeMatch[1].toLowerCase().replace(' ', '_') : 'unknown',
+    };
+  });
+
+  // Populate filters
+  const classes = [...new Set(allCards.map(c => c.cls))].sort();
+  const types   = [...new Set(allCards.map(c => c.type))].sort();
+  classes.forEach(cl => filterClass.innerHTML += `<option value="${cl}">${cap(cl)}</option>`);
+  types.forEach(t   => filterType.innerHTML  += `<option value="${t}">${cap(t.replace('_',' '))}</option>`);
+
+  document.getElementById('stateEl').style.display = 'none';
+  document.getElementById('main').style.display = 'block';
+  render();
+}
+
+// ── Render ─────────────────────────────────────────────────────
+const grid       = document.getElementById('grid');
+const searchEl   = document.getElementById('search');
+const filterClass= document.getElementById('filterClass');
+const filterType = document.getElementById('filterType');
+const countEl    = document.getElementById('count');
+
+function render() {
+  const q  = searchEl.value.toLowerCase();
+  const cl = filterClass.value;
+  const tp = filterType.value;
+
+  const filtered = allCards.filter(c => {
+    if (cl && c.cls  !== cl) return false;
+    if (tp && c.type !== tp) return false;
+    if (q && !(c.name + ' ' + c.html).toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  countEl.textContent = `${filtered.length} card${filtered.length !== 1 ? 's' : ''}`;
+
+  grid.innerHTML = filtered.length
+    ? filtered.map(c => `
+        <div class="card-wrap">
+          <div class="card-title">${esc(c.name)}</div>
+          ${c.html}
+        </div>`).join('')
+    : '<div class="empty">No cards match your filters.</div>';
+}
+
+// ── State screen ───────────────────────────────────────────────
+function setState(type, title, sub, retry = false) {
+  const el = document.getElementById('stateEl');
+  el.style.display = 'flex';
+  document.getElementById('main').style.display = 'none';
+  el.innerHTML = type === 'loading'
+    ? `<div class="spinner"></div><div class="state-title">${title}</div><div class="state-sub">${sub}</div>`
+    : `<div style="font-size:40px">⚠️</div><div class="state-title">${title}</div><div class="state-sub">${sub}</div>${retry ? '<button class="btn-retry" onclick="fetchCards()">↺ Try Again</button>' : ''}`;
+}
+
+// ── Utils ──────────────────────────────────────────────────────
+function esc(s) { return s.replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;'); }
+function cap(s) { return s.charAt(0).toUpperCase() + s.slice(1); }
+
+// ── Event listeners ────────────────────────────────────────────
+searchEl.addEventListener('input', render);
+filterClass.addEventListener('change', render);
+filterType.addEventListener('change', render);
+
+// ── Boot ───────────────────────────────────────────────────────
+fetchCards();
+</script>
+</body>
+</html>

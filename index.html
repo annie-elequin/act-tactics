@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Act Tactics — Card Visualizer</title>
+<script src="config.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 body{font-family:Georgia,serif;background:#f5f4f0;color:#1a1a1a;min-height:100vh;}
@@ -51,9 +52,6 @@ main{padding:24px 16px 60px;max-width:1400px;margin:0 auto;display:none;}
 .tp{display:inline-block;padding:0 5px;border-radius:3px;font-size:10.5px;font-weight:700;vertical-align:middle;line-height:1.6;margin:0 1px;}
 .trig{background:#EFF6FF;border-left:2px solid #3B82F6;padding:3px 6px;font-style:italic;color:#1e40af;line-height:1.4;}
 .passbox{border-left:2px solid #a78bfa;padding:3px 6px;color:#555;line-height:1.4;}
-.omenpass{border-left:2px solid #f87171;padding:3px 6px;color:#555;line-height:1.4;}
-.debtbox{border:0.5px solid #a855f7;border-radius:4px;padding:5px 7px;background:#faf5ff;color:#555;line-height:1.5;}
-.debtbox .dt-lbl{font-size:9px;font-weight:700;text-transform:uppercase;letter-spacing:1px;color:#7c3aed;margin-bottom:2px;}
 .discbox{border-left:2px solid #ef4444;padding:3px 6px;font-style:italic;color:#dc2626;line-height:1.4;}
 .hr{height:0.5px;background:#eee;flex-shrink:0;margin:2px 0;}
 .srlbl{font-size:10px;font-weight:700;color:#16a34a;text-transform:uppercase;letter-spacing:0.5px;margin-bottom:1px;}
@@ -96,22 +94,29 @@ main{padding:24px 16px 60px;max-width:1400px;margin:0 auto;display:none;}
 
 <script>
 const TABLE_ID = 911939;
+const TOKEN = window.BASEROW_TOKEN;
 const API = `https://api.baserow.io/api/database/rows/table/${TABLE_ID}/?user_field_names=true&size=200`;
 
 let allCards = [];
 
 // ── Fetch ──────────────────────────────────────────────────────
 async function fetchCards() {
+  if (!TOKEN) {
+    setState('error', 'No API token', 'Add your Baserow token to config.js (local) or set BASEROW_TOKEN in Netlify env vars.');
+    return;
+  }
   setState('loading', 'Loading cards…', 'Fetching from Baserow');
   try {
-    const res = await fetch(API);
+    const res = await fetch(API, {
+      headers: { 'Authorization': `Token ${TOKEN}` }
+    });
     if (!res.ok) throw new Error(`HTTP ${res.status}`);
     const data = await res.json();
     const rows = data.results || [];
     if (!rows.length) { setState('error', 'No cards found', 'The table is empty — run the uploader tool first.'); return; }
     init(rows);
   } catch(e) {
-    setState('error', 'Could not load cards', `${e.message}. Make sure the table has public read access in Baserow.`, true);
+    setState('error', 'Could not load cards', e.message, true);
   }
 }
 
@@ -140,11 +145,11 @@ function init(rows) {
 }
 
 // ── Render ─────────────────────────────────────────────────────
-const grid       = document.getElementById('grid');
-const searchEl   = document.getElementById('search');
-const filterClass= document.getElementById('filterClass');
-const filterType = document.getElementById('filterType');
-const countEl    = document.getElementById('count');
+const grid        = document.getElementById('grid');
+const searchEl    = document.getElementById('search');
+const filterClass = document.getElementById('filterClass');
+const filterType  = document.getElementById('filterType');
+const countEl     = document.getElementById('count');
 
 function render() {
   const q  = searchEl.value.toLowerCase();

@@ -1,0 +1,3 @@
+[build]
+  command = "echo \"window.BASEROW_TOKEN='$BASEROW_TOKEN';\" > config.js"
+  publish = "."

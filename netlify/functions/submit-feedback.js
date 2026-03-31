@@ -1,4 +1,4 @@
-const TEAM_ID = '7c677f9b-7fbf-4cf6-a493-5abfb41020b9';
+const TEAM_IDENTIFIER = 'ANN';
 const PROJECT_NAME = 'Act Tactics Visualizer';
 const LINEAR_API = 'https://api.linear.app/graphql';
 
@@ -35,26 +35,37 @@ exports.handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ error: 'Title is required' }) };
   }
 
-  // Look up the project ID by name so we don't have to hardcode it
+  // Resolve team UUID and project ID in one query
+  let teamId = null;
   let projectId = null;
   try {
-    const projectData = await linearRequest(apiKey, `
+    const data = await linearRequest(apiKey, `
       query {
-        team(id: "${TEAM_ID}") {
-          projects { nodes { id name } }
+        teams {
+          nodes {
+            id
+            identifier
+            projects { nodes { id name } }
+          }
         }
       }
     `);
-    const project = projectData.data?.team?.projects?.nodes?.find(p => p.name === PROJECT_NAME);
+    const team = data.data?.teams?.nodes?.find(t => t.identifier === TEAM_IDENTIFIER);
+    teamId = team?.id ?? null;
+    const project = team?.projects?.nodes?.find(p => p.name === PROJECT_NAME);
     projectId = project?.id ?? null;
   } catch {
-    // If project lookup fails, fall through to team backlog
+    // fall through — will fail below if teamId is still null
+  }
+
+  if (!teamId) {
+    return { statusCode: 500, body: JSON.stringify({ error: `Could not find team with identifier "${TEAM_IDENTIFIER}"` }) };
   }
 
   const mutation = `
     mutation {
       issueCreate(input: {
-        teamId: "${TEAM_ID}"
+        teamId: "${teamId}"
         ${projectId ? `projectId: "${projectId}"` : ''}
         title: ${JSON.stringify(title.trim())}
         description: ${JSON.stringify(description?.trim() ?? '')}

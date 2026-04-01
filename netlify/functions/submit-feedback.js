@@ -13,6 +13,43 @@ async function linearRequest(apiKey, query) {
   return res.json();
 }
 
+async function uploadScreenshot(apiKey, base64Data, contentType) {
+  const buffer = Buffer.from(base64Data, 'base64');
+  const size = buffer.length;
+  const ext = contentType.split('/')[1] || 'png';
+  const filename = `feedback-screenshot.${ext}`;
+
+  // Ask Linear for a signed upload URL
+  const uploadData = await linearRequest(apiKey, `
+    mutation {
+      fileUpload(contentType: "${contentType}", filename: "${filename}", size: ${size}) {
+        success
+        uploadFile {
+          uploadUrl
+          assetUrl
+          headers { key value }
+        }
+      }
+    }
+  `);
+
+  if (!uploadData.data?.fileUpload?.success) return null;
+
+  const { uploadUrl, assetUrl, headers } = uploadData.data.fileUpload.uploadFile;
+
+  // Upload the binary to S3
+  const uploadHeaders = { 'Content-Type': contentType };
+  (headers || []).forEach(h => { uploadHeaders[h.key] = h.value; });
+
+  await fetch(uploadUrl, {
+    method: 'PUT',
+    headers: uploadHeaders,
+    body: buffer,
+  });
+
+  return assetUrl;
+}
+
 exports.handler = async (event) => {
   if (event.httpMethod !== 'POST') {
     return { statusCode: 405, body: JSON.stringify({ error: 'Method not allowed' }) };
@@ -23,9 +60,9 @@ exports.handler = async (event) => {
     return { statusCode: 500, body: JSON.stringify({ error: 'LINEAR_API_KEY not configured' }) };
   }
 
-  let title, description;
+  let title, description, screenshotData, screenshotType;
   try {
-    ({ title, description } = JSON.parse(event.body));
+    ({ title, description, screenshotData, screenshotType } = JSON.parse(event.body));
   } catch {
     return { statusCode: 400, body: JSON.stringify({ error: 'Invalid request body' }) };
   }
@@ -34,7 +71,7 @@ exports.handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ error: 'Title is required' }) };
   }
 
-  // Fetch the first team and look for the project in one query
+  // Resolve team + project
   const lookupData = await linearRequest(apiKey, `
     query {
       viewer {
@@ -59,14 +96,26 @@ exports.handler = async (event) => {
 
   const project = team.projects?.nodes?.find(p => p.name === PROJECT_NAME);
 
-  // Create the issue
+  // Upload screenshot if provided, then append to description
+  let fullDescription = description?.trim() ?? '';
+  if (screenshotData && screenshotType) {
+    try {
+      const assetUrl = await uploadScreenshot(apiKey, screenshotData, screenshotType);
+      if (assetUrl) {
+        fullDescription += (fullDescription ? '\n\n' : '') + `![Screenshot](${assetUrl})`;
+      }
+    } catch {
+      // Non-fatal — submit without screenshot
+    }
+  }
+
   const mutation = `
     mutation {
       issueCreate(input: {
         teamId: "${team.id}"
         ${project ? `projectId: "${project.id}"` : ''}
         title: ${JSON.stringify(title.trim())}
-        description: ${JSON.stringify(description?.trim() ?? '')}
+        description: ${JSON.stringify(fullDescription)}
       }) {
         success
         issue { id identifier url }

@@ -5,6 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Act Tactics — Card Visualizer</title>
 <script src="config.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.9.3/dist/confetti.browser.min.js"></script>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,400;0,600;0,700;1,400&display=swap" rel="stylesheet">
@@ -98,6 +99,21 @@ main{padding:24px 16px 60px;max-width:1400px;margin:0 auto;display:none;}
 .btn-submit:disabled{opacity:0.5;cursor:not-allowed;}
 .btn-cancel{padding:9px 16px;border-radius:8px;background:transparent;color:#888;border:1px solid #3a3a50;font-family:'Open Sans',sans-serif;font-size:14px;cursor:pointer;transition:color 0.15s,border-color 0.15s;}
 .btn-cancel:hover{color:#ccc;border-color:#666;}
+.fb-shot-hint{font-size:12px;color:#666;line-height:1.5;margin-top:4px;}
+.fb-shot-zone{margin-top:8px;border:1px dashed #3a3a50;border-radius:8px;padding:12px;background:#0f0f18;min-height:72px;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:8px;text-align:center;}
+.fb-shot-zone.has-image{padding:8px;min-height:auto;align-items:stretch;}
+.fb-shot-zone img{max-width:100%;max-height:180px;object-fit:contain;border-radius:6px;border:1px solid #2a2a3a;}
+.fb-shot-actions{display:flex;gap:8px;justify-content:center;flex-wrap:wrap;}
+.fb-shot-remove{font-size:12px;font-weight:600;background:transparent;color:#f87171;border:1px solid #7f1d1d;padding:6px 12px;border-radius:6px;cursor:pointer;font-family:'Open Sans',sans-serif;}
+.fb-shot-remove:hover{background:#3f1d1d;}
+
+/* ── Feedback toast (bottom-left) ────────────────────────────── */
+.feedback-toast{position:fixed;bottom:20px;left:20px;z-index:250;max-width:min(340px,calc(100vw - 40px));padding:12px 16px;border-radius:10px;font-size:14px;font-weight:600;font-family:'Open Sans',sans-serif;line-height:1.4;box-shadow:0 8px 32px rgba(0,0,0,0.35);border:1px solid #3a3a50;background:#1a1a24;color:#e8e8f0;display:flex;align-items:center;gap:10px;transform:translateY(16px);opacity:0;pointer-events:none;transition:transform 0.25s ease,opacity 0.25s ease;}
+.feedback-toast.visible{transform:translateY(0);opacity:1;pointer-events:auto;}
+.feedback-toast.submitting{border-color:#5b21b6;}
+.feedback-toast.success{border-color:#166534;color:#bbf7d0;}
+.feedback-toast.error{border-color:#991b1b;color:#fecaca;}
+.toast-spin{width:18px;height:18px;border:2px solid #3a3a50;border-top-color:#a78bfa;border-radius:50%;flex-shrink:0;animation:spin 0.75s linear infinite;}
 </style>
 </head>
 <body>
@@ -144,6 +160,19 @@ main{padding:24px 16px 60px;max-width:1400px;margin:0 auto;display:none;}
       <label for="fbDesc">Details <span style="color:#555;font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label>
       <textarea id="fbDesc" placeholder="Any additional context, steps to reproduce, or suggestions…"></textarea>
     </div>
+    <div>
+      <label>Screenshot <span style="color:#555;font-weight:400;text-transform:none;letter-spacing:0">(optional)</span></label>
+      <p class="fb-shot-hint">Paste an image with ⌘V / Ctrl+V while this window is open, or choose a file.</p>
+      <div class="fb-shot-zone" id="fbShotZone">
+        <span id="fbShotPlaceholder" style="font-size:13px;color:#555">No image attached</span>
+        <img id="fbShotPreview" alt="" style="display:none">
+        <div class="fb-shot-actions" id="fbShotActions" style="display:none">
+          <button type="button" class="fb-shot-remove" onclick="clearFeedbackScreenshot()">Remove image</button>
+        </div>
+      </div>
+      <input type="file" id="fbShotFile" accept="image/*" style="display:none" onchange="onFeedbackScreenshotFile(this)">
+      <button type="button" class="btn-cancel" style="margin-top:8px;font-size:12px;padding:6px 12px" onclick="document.getElementById('fbShotFile').click()">Choose image…</button>
+    </div>
     <div class="modal-footer">
       <span class="modal-status" id="modalStatus"></span>
       <button class="btn-cancel" onclick="closeFeedback()">Cancel</button>
@@ -152,12 +181,18 @@ main{padding:24px 16px 60px;max-width:1400px;margin:0 auto;display:none;}
   </div>
 </div>
 
+<div id="feedbackToast" class="feedback-toast" role="status" aria-live="polite"></div>
+
 <script>
 const TABLE_ID = 911939;
 const TOKEN = window.BASEROW_TOKEN;
 const API = `https://api.baserow.io/api/database/rows/table/${TABLE_ID}/?user_field_names=true&size=200`;
 
 let allCards = [];
+/** @type {{ base64: string, type: string } | null} */
+let feedbackScreenshot = null;
+const FB_SHOT_MAX_SIDE = 2048;
+let feedbackToastHideTimer = null;
 
 // ── Fetch (initial — shows full loading screen) ────────────────
 async function fetchCards() {
@@ -276,15 +311,150 @@ function setState(type, title, sub, retry = false) {
 }
 
 // ── Feedback modal ─────────────────────────────────────────────
-function openFeedback() {
+function resetFeedbackFormFields() {
   document.getElementById('fbTitle').value = '';
   document.getElementById('fbDesc').value = '';
+  document.getElementById('fbShotFile').value = '';
+  clearFeedbackScreenshot();
   document.getElementById('modalStatus').textContent = '';
   document.getElementById('modalStatus').className = 'modal-status';
   document.getElementById('btnSubmit').disabled = false;
   document.getElementById('btnSubmit').textContent = 'Submit →';
+}
+
+function openFeedback() {
+  resetFeedbackFormFields();
   document.getElementById('modalOverlay').classList.add('open');
   setTimeout(() => document.getElementById('fbTitle').focus(), 50);
+}
+
+function setFeedbackToast(html, variant) {
+  const el = document.getElementById('feedbackToast');
+  clearTimeout(feedbackToastHideTimer);
+  el.className = 'feedback-toast visible ' + variant;
+  el.innerHTML = html;
+}
+
+function hideFeedbackToast(delayMs) {
+  clearTimeout(feedbackToastHideTimer);
+  feedbackToastHideTimer = setTimeout(() => {
+    document.getElementById('feedbackToast').classList.remove('visible');
+  }, delayMs);
+}
+
+function clearFeedbackScreenshot() {
+  feedbackScreenshot = null;
+  const zone = document.getElementById('fbShotZone');
+  const ph = document.getElementById('fbShotPlaceholder');
+  const img = document.getElementById('fbShotPreview');
+  const actions = document.getElementById('fbShotActions');
+  zone.classList.remove('has-image');
+  ph.style.display = '';
+  img.style.display = 'none';
+  img.removeAttribute('src');
+  actions.style.display = 'none';
+}
+
+function renderFeedbackScreenshotPreview(dataUrl) {
+  const zone = document.getElementById('fbShotZone');
+  const ph = document.getElementById('fbShotPlaceholder');
+  const img = document.getElementById('fbShotPreview');
+  const actions = document.getElementById('fbShotActions');
+  zone.classList.add('has-image');
+  ph.style.display = 'none';
+  img.src = dataUrl;
+  img.style.display = 'block';
+  actions.style.display = 'flex';
+}
+
+/**
+ * @param {string} dataUrl
+ * @returns {Promise<{ base64: string, type: string, previewUrl: string }>}
+ */
+function normalizeFeedbackImage(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const i = new Image();
+    i.onload = () => {
+      let w = i.naturalWidth;
+      let h = i.naturalHeight;
+      const max = FB_SHOT_MAX_SIDE;
+      if (w > max || h > max) {
+        const s = max / Math.max(w, h);
+        w = Math.round(w * s);
+        h = Math.round(h * s);
+      }
+      const c = document.createElement('canvas');
+      c.width = w;
+      c.height = h;
+      const ctx = c.getContext('2d');
+      if (!ctx) {
+        reject(new Error('Could not process image'));
+        return;
+      }
+      ctx.fillStyle = '#fff';
+      ctx.fillRect(0, 0, w, h);
+      ctx.drawImage(i, 0, 0, w, h);
+      const outType = 'image/jpeg';
+      const previewUrl = c.toDataURL(outType, 0.9);
+      const base64 = previewUrl.split(',')[1];
+      resolve({ base64, type: outType, previewUrl });
+    };
+    i.onerror = () => reject(new Error('Invalid image'));
+    i.src = dataUrl;
+  });
+}
+
+async function setFeedbackScreenshotFromFile(file) {
+  if (!file || !file.type.startsWith('image/')) return;
+  const reader = new FileReader();
+  const dataUrl = await new Promise((res, rej) => {
+    reader.onload = () => res(reader.result);
+    reader.onerror = () => rej(new Error('Could not read file'));
+    reader.readAsDataURL(file);
+  });
+  try {
+    const norm = await normalizeFeedbackImage(dataUrl);
+    feedbackScreenshot = { base64: norm.base64, type: norm.type };
+    renderFeedbackScreenshotPreview(norm.previewUrl);
+  } catch (e) {
+    document.getElementById('modalStatus').textContent = e.message || 'Could not use that image.';
+    document.getElementById('modalStatus').className = 'modal-status error';
+  }
+}
+
+async function onFeedbackScreenshotFile(input) {
+  const f = input.files?.[0];
+  if (f) await setFeedbackScreenshotFromFile(f);
+  input.value = '';
+}
+
+document.addEventListener('paste', (e) => {
+  const overlay = document.getElementById('modalOverlay');
+  if (!overlay.classList.contains('open')) return;
+  const items = e.clipboardData?.items;
+  if (!items) return;
+  for (let j = 0; j < items.length; j++) {
+    const it = items[j];
+    if (it.kind === 'file' && it.type.startsWith('image/')) {
+      e.preventDefault();
+      const file = it.getAsFile();
+      if (file) setFeedbackScreenshotFromFile(file);
+      break;
+    }
+  }
+});
+
+function fireFeedbackConfetti() {
+  if (typeof confetti !== 'function') return;
+  const count = 130;
+  const defaults = { origin: { y: 0.72 }, zIndex: 300 };
+  confetti({ ...defaults, particleCount: count, spread: 76, startVelocity: 38 });
+  setTimeout(() => {
+    confetti({ ...defaults, particleCount: Math.round(count * 0.45), angle: 55, spread: 50, origin: { x: 0, y: 0.65 }, zIndex: 300 });
+  }, 160);
+  setTimeout(() => {
+    confetti({ ...defaults, particleCount: Math.round(count * 0.45), angle: 125, spread: 50, origin: { x: 1, y: 0.65 }, zIndex: 300 });
+  }, 320);
 }
 
 function closeFeedback() {
@@ -299,7 +469,6 @@ async function submitFeedback() {
   const title = document.getElementById('fbTitle').value.trim();
   const description = document.getElementById('fbDesc').value.trim();
   const statusEl = document.getElementById('modalStatus');
-  const submitBtn = document.getElementById('btnSubmit');
 
   if (!title) {
     statusEl.textContent = 'Please add a title.';
@@ -308,31 +477,33 @@ async function submitFeedback() {
     return;
   }
 
-  submitBtn.disabled = true;
-  submitBtn.textContent = 'Submitting…';
-  statusEl.textContent = '';
-  statusEl.className = 'modal-status';
+  const payload = { title, description };
+  if (feedbackScreenshot) {
+    payload.screenshotData = feedbackScreenshot.base64;
+    payload.screenshotType = feedbackScreenshot.type;
+  }
+
+  resetFeedbackFormFields();
+  closeFeedback();
+  setFeedbackToast('<span class="toast-spin" aria-hidden="true"></span> Submitting…', 'submitting');
 
   try {
     const res = await fetch('/.netlify/functions/submit-feedback', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ title, description }),
+      body: JSON.stringify(payload),
     });
     const data = await res.json();
     if (data.success) {
-      statusEl.textContent = `✓ Submitted as ${data.issue.identifier}`;
-      statusEl.className = 'modal-status success';
-      submitBtn.textContent = 'Done!';
-      setTimeout(closeFeedback, 1800);
+      fireFeedbackConfetti();
+      setFeedbackToast('✓ Submitted', 'success');
+      hideFeedbackToast(3500);
     } else {
       throw new Error(data.error || 'Unknown error');
     }
-  } catch(e) {
-    statusEl.textContent = `Error: ${e.message}`;
-    statusEl.className = 'modal-status error';
-    submitBtn.disabled = false;
-    submitBtn.textContent = 'Submit →';
+  } catch (e) {
+    setFeedbackToast('Couldn’t send feedback: ' + esc(String(e.message || e)), 'error');
+    hideFeedbackToast(6500);
   }
 }
 

@@ -1,4 +1,3 @@
-const TEAM_IDENTIFIER = 'ANN';
 const PROJECT_NAME = 'Act Tactics Visualizer';
 const LINEAR_API = 'https://api.linear.app/graphql';
 
@@ -35,40 +34,37 @@ exports.handler = async (event) => {
     return { statusCode: 400, body: JSON.stringify({ error: 'Title is required' }) };
   }
 
-  // Use viewer-scoped query — works with minimal API key permissions
-  let teamId = null;
-  let projectId = null;
-  try {
-    const data = await linearRequest(apiKey, `
-      query {
-        viewer {
-          teams {
-            nodes {
-              id
-              identifier
-              projects { nodes { id name } }
-            }
+  // Fetch the first team and look for the project in one query
+  const lookupData = await linearRequest(apiKey, `
+    query {
+      viewer {
+        teams {
+          nodes {
+            id
+            projects { nodes { id name } }
           }
         }
       }
-    `);
-    const team = data.data?.viewer?.teams?.nodes?.find(t => t.identifier === TEAM_IDENTIFIER);
-    teamId = team?.id ?? null;
-    const project = team?.projects?.nodes?.find(p => p.name === PROJECT_NAME);
-    projectId = project?.id ?? null;
-  } catch {
-    // fall through — will fail below if teamId is still null
+    }
+  `);
+
+  if (lookupData.errors?.length) {
+    return { statusCode: 500, body: JSON.stringify({ error: 'Linear API error: ' + lookupData.errors[0].message }) };
   }
 
-  if (!teamId) {
-    return { statusCode: 500, body: JSON.stringify({ error: `Could not find team "${TEAM_IDENTIFIER}". Make sure your LINEAR_API_KEY has Read permission.` }) };
+  const team = lookupData.data?.viewer?.teams?.nodes?.[0];
+  if (!team) {
+    return { statusCode: 500, body: JSON.stringify({ error: 'No teams found for this API key' }) };
   }
 
+  const project = team.projects?.nodes?.find(p => p.name === PROJECT_NAME);
+
+  // Create the issue
   const mutation = `
     mutation {
       issueCreate(input: {
-        teamId: "${teamId}"
-        ${projectId ? `projectId: "${projectId}"` : ''}
+        teamId: "${team.id}"
+        ${project ? `projectId: "${project.id}"` : ''}
         title: ${JSON.stringify(title.trim())}
         description: ${JSON.stringify(description?.trim() ?? '')}
       }) {
@@ -78,18 +74,16 @@ exports.handler = async (event) => {
     }
   `;
 
-  try {
-    const data = await linearRequest(apiKey, mutation);
-    if (data.data?.issueCreate?.success) {
-      return {
-        statusCode: 200,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ success: true, issue: data.data.issueCreate.issue }),
-      };
-    }
-    const msg = data.errors?.[0]?.message ?? 'Linear returned an error';
-    return { statusCode: 500, body: JSON.stringify({ error: msg }) };
-  } catch (e) {
-    return { statusCode: 500, body: JSON.stringify({ error: e.message }) };
+  const createData = await linearRequest(apiKey, mutation);
+
+  if (createData.data?.issueCreate?.success) {
+    return {
+      statusCode: 200,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ success: true, issue: createData.data.issueCreate.issue }),
+    };
   }
+
+  const msg = createData.errors?.[0]?.message ?? 'Linear returned an error';
+  return { statusCode: 500, body: JSON.stringify({ error: msg }) };
 };
